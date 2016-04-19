@@ -1,9 +1,12 @@
 #include "t_lib.h"
-
+/* Pointers to running and ready queues */
 tcb *running;
 tcb *ready;
+
+/* To help with t_yield */
 tcb *last_ready;
 
+/* The calling thread volunarily relinquishes the CPU, and is placed at the end of the ready queue. The first thread (if there is one) in the ready queue resumes execution. */
 void t_yield() {
 	if(ready != NULL) {
 		last_ready->next = running;
@@ -16,6 +19,7 @@ void t_yield() {
 	}
 }
 
+/* Initialize the thread library by setting up the "running" and the "ready" queues, creating TCB of the "main" thread, and inserting it into the running queue. */
 void t_init() {
 	tcb *tmp;
 	tmp = (tcb *) malloc(sizeof(tcb));
@@ -29,6 +33,7 @@ void t_init() {
 	ready = last_ready = NULL;
 }
 
+/* Create a thread with priority pri, start function func with argument thr_id as the thread id. Function func should be of type void func(int). TCB of the newly created thread is added to the end of the "ready" queue; the parent thread calling t_create() continues its execution upon returning from t_create(). */
 int t_create(void (*fct)(int), int id, int pri) {
 	size_t sz = 0x10000;
 
@@ -59,6 +64,7 @@ int t_create(void (*fct)(int), int id, int pri) {
 	last_ready->next = NULL;
 }
 
+/* Shut down the thread library by freeing all the dynamically allocated memory. */
 void t_shutdown() {
 	tcb *tmp;
 	while(running != NULL) {
@@ -77,6 +83,7 @@ void t_shutdown() {
 	}
 }
 
+/* Terminate the calling thread by removing (and freeing) its TCB from the "running" queue, and resuming execution of the thread in the head of the "ready" queue via setcontext(). */
 void t_terminate() {
 	if(ready == NULL) {
 		t_shutdown();

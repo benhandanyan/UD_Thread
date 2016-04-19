@@ -6,6 +6,9 @@
 #include <ucontext.h>
 #include <sys/mman.h>
 
+/**
+ * Our thread control block
+ */
 struct tcb {
 	int thread_id;
 	int thread_priority;
