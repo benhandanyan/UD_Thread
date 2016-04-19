@@ -5,12 +5,15 @@ tcb *ready;
 tcb *last_ready;
 
 void t_yield() {
-	last_ready->next = running;
-	last_ready = last_ready->next;
-	running = ready;
-	ready = running->next;
+	if(ready != NULL) {
+		last_ready->next = running;
+		last_ready = last_ready->next;
+		running = ready;
+		ready = ready->next;
+		running->next = NULL;
 
-	swapcontext(last_ready->thead_context, running->thread_context);
+		swapcontext(last_ready->thread_context, running->thread_context);
+	}
 }
 
 void t_init() {
@@ -18,8 +21,8 @@ void t_init() {
 	tmp = (tcb *) malloc(sizeof(tcb));
 	tmp->thread_context = (ucontext_t *) malloc(sizeof(ucontext_t));
 
-	tcb->thread_id = 0;
-	tcb->priority = 0;
+	tmp->thread_id = 0;
+	tmp->thread_priority = 0;
 	getcontext(tmp->thread_context);    /* let tmp be the context of main() */
 	tmp->next = NULL;
 	running = tmp;
@@ -60,12 +63,14 @@ void t_shutdown() {
 	tcb *tmp;
 	while(running != NULL) {
 		tmp = running->next;
+		free(running->thread_context->uc_stack.ss_sp);
 		free(running->thread_context);
 		free(running);
 		running = tmp;
 	}
 	while(ready != NULL) {
 		tmp = ready->next;
+		free(ready->thread_context->uc_stack.ss_sp);
 		free(ready->thread_context);
 		free(ready);
 		ready = tmp;
@@ -81,6 +86,7 @@ void t_terminate() {
 		running = ready;
 		ready = running->next;
 		running->next = NULL;
+		free(tmp->thread_context->uc_stack.ss_sp);
 		free(tmp->thread_context);
 		free(tmp);
 		setcontext(running->thread_context);	
