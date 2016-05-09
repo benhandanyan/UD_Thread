@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <ucontext.h>
 #include <sys/mman.h>
+#include <signal.h>
+#include <unistd.h>
 
 /**
  * Our thread control block

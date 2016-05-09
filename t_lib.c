@@ -8,15 +8,21 @@ tcb *ready_high;
 tcb *last_ready_low;
 tcb *last_ready_high;
 
+const useconds_t timeout = 1;
+
 /* The calling thread volunarily relinquishes the CPU, and is placed at the end of the ready queue. The first thread (if there is one) in the ready queue resumes execution. 
  * Phase 2: Run higher priority threads first */
 void t_yield() {
+	ualarm(0,0);
+	sighold(SIGALRM);
 	if(running->thread_priority == 0 && ready_high != NULL) {
 		last_ready_high->next = running;
 		last_ready_high = last_ready_high->next;
 		running = ready_high;
 		ready_high = ready_high->next;
 		running->next = NULL;
+		ualarm(timeout,0);
+		sigrelse(SIGALRM);
 		swapcontext(last_ready_high->thread_context, running->thread_context);
 	} else if(running->thread_priority == 1 && ready_high != NULL) {
 		last_ready_low->next = running;
@@ -24,6 +30,8 @@ void t_yield() {
 		running = ready_high;
 		ready_high = ready_high->next;
 		running->next = NULL;
+		ualarm(timeout,0);
+		sigrelse(SIGALRM);
 		swapcontext(last_ready_low->thread_context, running->thread_context);
 	} else if(running->thread_priority == 1 && ready_low != NULL) {
 		last_ready_low->next = running;
@@ -31,8 +39,15 @@ void t_yield() {
 		running = ready_low;
 		ready_low = ready_low->next;
 		running->next = NULL;
+		ualarm(timeout,0);
+		sigrelse(SIGALRM);
 		swapcontext(last_ready_low->thread_context, running->thread_context);
 	}
+}
+
+void sig_handler() {
+	signal(SIGALRM, sig_handler);
+	t_yield();
 }
 
 /* Initialize the thread library by setting up the "running" and the "ready" queues, creating TCB of the "main" thread, and inserting it into the running queue. */
@@ -48,6 +63,9 @@ void t_init() {
 	running = tmp;
 	ready_low = last_ready_low = NULL;
 	ready_high = last_ready_high = NULL;
+
+	signal(SIGALRM, sig_handler);
+	ualarm(timeout,0);
 }
 
 /* Create a thread with priority pri, start function func with argument thr_id as the thread id. Function func should be of type void func(int). TCB of the newly created thread is added to the end of the "ready" queue; the parent thread calling t_create() continues its execution upon returning from t_create(). */
