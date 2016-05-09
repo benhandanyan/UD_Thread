@@ -1,21 +1,37 @@
 #include "t_lib.h"
 /* Pointers to running and ready queues */
 tcb *running;
-tcb *ready;
+tcb *ready_low;
+tcb *ready_high;
 
 /* To help with t_yield */
-tcb *last_ready;
+tcb *last_ready_low;
+tcb *last_ready_high;
 
-/* The calling thread volunarily relinquishes the CPU, and is placed at the end of the ready queue. The first thread (if there is one) in the ready queue resumes execution. */
+/* The calling thread volunarily relinquishes the CPU, and is placed at the end of the ready queue. The first thread (if there is one) in the ready queue resumes execution. 
+ * Phase 2: Run higher priority threads first */
 void t_yield() {
-	if(ready != NULL) {
-		last_ready->next = running;
-		last_ready = last_ready->next;
-		running = ready;
-		ready = ready->next;
+	if(running->thread_priority == 0 && ready_high != NULL) {
+		last_ready_high->next = running;
+		last_ready_high = last_ready_high->next;
+		running = ready_high;
+		ready_high = ready_high->next;
 		running->next = NULL;
-
-		swapcontext(last_ready->thread_context, running->thread_context);
+		swapcontext(last_ready_high->thread_context, running->thread_context);
+	} else if(running->thread_priority == 1 && ready_high != NULL) {
+		last_ready_low->next = running;
+		last_ready_low = last_ready_low->next;
+		running = ready_high;
+		ready_high = ready_high->next;
+		running->next = NULL;
+		swapcontext(last_ready_low->thread_context, running->thread_context);
+	} else if(running->thread_priority == 1 && ready_low != NULL) {
+		last_ready_low->next = running;
+		last_ready_low = last_ready_low->next;
+		running = ready_low;
+		ready_low = ready_low->next;
+		running->next = NULL;
+		swapcontext(last_ready_low->thread_context, running->thread_context);
 	}
 }
 
@@ -26,11 +42,12 @@ void t_init() {
 	tmp->thread_context = (ucontext_t *) malloc(sizeof(ucontext_t));
 
 	tmp->thread_id = 0;
-	tmp->thread_priority = 0;
+	tmp->thread_priority = 1;
 	getcontext(tmp->thread_context);    /* let tmp be the context of main() */
 	tmp->next = NULL;
 	running = tmp;
-	ready = last_ready = NULL;
+	ready_low = last_ready_low = NULL;
+	ready_high = last_ready_high = NULL;
 }
 
 /* Create a thread with priority pri, start function func with argument thr_id as the thread id. Function func should be of type void func(int). TCB of the newly created thread is added to the end of the "ready" queue; the parent thread calling t_create() continues its execution upon returning from t_create(). */
@@ -55,13 +72,25 @@ int t_create(void (*fct)(int), int id, int pri) {
 	tmp->thread_context->uc_stack.ss_flags = 0;
 	tmp->thread_context->uc_link = running->thread_context; 
 	makecontext(tmp->thread_context, (void (*)(void)) fct, 1, id);
-	if(ready == NULL) {
-		ready = tmp;
-	} else {
-		last_ready->next = tmp;
+	
+	/* High priority */
+	if(pri == 0) {
+		if(ready_high == NULL) {
+			ready_high = tmp;
+		} else {
+			last_ready_high->next = tmp;
+		}
+		last_ready_high = tmp;
+		last_ready_high->next = NULL;
+	} else { /*Low priority */
+		if(ready_low == NULL) {
+			ready_low = tmp;
+		} else {
+			last_ready_low->next = tmp;
+		}
+		last_ready_low = tmp;
+		last_ready_low->next = NULL;
 	}
-	last_ready = tmp;
-	last_ready->next = NULL;
 }
 
 /* Shut down the thread library by freeing all the dynamically allocated memory. */
@@ -74,24 +103,36 @@ void t_shutdown() {
 		free(running);
 		running = tmp;
 	}
-	while(ready != NULL) {
-		tmp = ready->next;
-		free(ready->thread_context->uc_stack.ss_sp);
-		free(ready->thread_context);
-		free(ready);
-		ready = tmp;
+	while(ready_high != NULL) {
+		tmp = ready_high->next;
+		free(ready_high->thread_context->uc_stack.ss_sp);
+		free(ready_high->thread_context);
+		free(ready_high);
+		ready_high = tmp;
+	}
+	while(ready_low != NULL) {
+		tmp = ready_low->next;
+		free(ready_low->thread_context->uc_stack.ss_sp);
+		free(ready_low->thread_context);
+		free(ready_low);
+		ready_low = tmp;
 	}
 }
 
 /* Terminate the calling thread by removing (and freeing) its TCB from the "running" queue, and resuming execution of the thread in the head of the "ready" queue via setcontext(). */
 void t_terminate() {
-	if(ready == NULL) {
+	if(ready_high == NULL && ready_low == NULL) {
 		t_shutdown();
 	} else {
 		tcb *tmp;
 		tmp = running;
-		running = ready;
-		ready = running->next;
+		if(ready_high != NULL) {
+			running = ready_high;
+			ready_high = running->next;
+		} else {
+			running = ready_low;
+			ready_low = running->next;
+		}
 		running->next = NULL;
 		free(tmp->thread_context->uc_stack.ss_sp);
 		free(tmp->thread_context);
