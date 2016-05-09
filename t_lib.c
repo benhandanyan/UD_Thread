@@ -14,7 +14,6 @@ const useconds_t timeout = 1;
  * Phase 2: Run higher priority threads first */
 void t_yield() {
 	ualarm(0,0);
-	sighold(SIGALRM);
 	if(running->thread_priority == 0 && ready_high != NULL) {
 		last_ready_high->next = running;
 		last_ready_high = last_ready_high->next;
@@ -22,7 +21,6 @@ void t_yield() {
 		ready_high = ready_high->next;
 		running->next = NULL;
 		ualarm(timeout,0);
-		sigrelse(SIGALRM);
 		swapcontext(last_ready_high->thread_context, running->thread_context);
 	} else if(running->thread_priority == 1 && ready_high != NULL) {
 		last_ready_low->next = running;
@@ -31,7 +29,6 @@ void t_yield() {
 		ready_high = ready_high->next;
 		running->next = NULL;
 		ualarm(timeout,0);
-		sigrelse(SIGALRM);
 		swapcontext(last_ready_low->thread_context, running->thread_context);
 	} else if(running->thread_priority == 1 && ready_low != NULL) {
 		last_ready_low->next = running;
@@ -40,7 +37,6 @@ void t_yield() {
 		ready_low = ready_low->next;
 		running->next = NULL;
 		ualarm(timeout,0);
-		sigrelse(SIGALRM);
 		swapcontext(last_ready_low->thread_context, running->thread_context);
 	}
 }
