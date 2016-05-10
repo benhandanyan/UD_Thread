@@ -8,6 +8,7 @@ tcb *ready_high;
 tcb *last_ready_low;
 tcb *last_ready_high;
 
+/* 1 microsecond */
 const useconds_t timeout = 1;
 
 /* The calling thread volunarily relinquishes the CPU, and is placed at the end of the ready queue. The first thread (if there is one) in the ready queue resumes execution. 
