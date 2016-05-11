@@ -17,3 +17,20 @@ struct tcb {
 };
 
 typedef struct tcb tcb;
+
+typedef struct {
+  int count;
+  tcb *q;
+} sem_t;
+
+typedef struct msg {
+  char       *message;
+  int         length;
+  struct msg *next;
+} msg;
+
+typedef struct {
+  struct mboxnode *first;
+  struct mboxnode *last;
+  sem_t *mutex;
+} mbox;

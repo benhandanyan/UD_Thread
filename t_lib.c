@@ -140,3 +140,87 @@ void t_terminate() {
 		setcontext(running->thread_context);	
 	}
 }
+
+int sem_init(sem_t **sp, int sem_count) {
+  *sp = malloc(sizeof(sem_t));
+  (*sp)->count = sem_count;
+  (*sp)->q = NULL;
+}
+
+void sem_wait(sem_t *s) {
+	s->count--;
+
+	/* Blocked. Add to semaphore's queue */
+	if(s->count < 0) {
+		if(ready_high != NULL) {
+			tcb *tmp = s->q;
+			s->q = running;
+			s->q->next = tmp;
+        	running = ready_high;
+        	ready_high = ready_high->next;
+			if(ready_high == NULL) last_ready_high = ready_high;
+        	running->next = NULL;
+        	swapcontext(s->q->thread_context, running->thread_context);
+		} else if(ready_low != NULL) {
+			tcb *tmp = s->q;
+			s->q = running;
+			s->q->next = tmp;
+			running = ready_low;
+			ready_low = ready_low->next;
+			if(ready_low == NULL) last_ready_low = ready_low;
+			running->next = NULL;
+			swapcontext(s->q->thread_context, running->thread_context);
+		}
+	}
+}
+
+void sem_signal(sem_t *s) {
+	s->count++;
+	if(s->q != NULL) {
+		tcb *tmp;
+		tmp = s->q->next;
+		if(s->q->thread_priority == 0) {
+			if(ready_high == NULL) {
+				ready_high = s->q;
+			} else {
+				last_ready_high->next = s->q;
+			}
+			last_ready_high = s->q;
+			last_ready_high->next = NULL;
+			s->q = tmp;
+		} else {
+			if(ready_low == NULL) {
+				ready_low = s->q;
+			} else {
+				last_ready_low->next = s->q;
+			}
+			last_ready_low = s->q;
+			last_ready_low->next = NULL;
+			s->q = tmp;
+		}
+	}
+}
+
+void sem_destroy(sem_t **sp) {
+	tcb *tmp;
+	while((*sp)->q != NULL) {
+		tmp = (*sp)->q->next;
+		free((*sp)->q->thread_context->uc_stack.ss_sp);
+		free((*sp)->q->thread_context);
+		free((*sp)->q);
+		(*sp)->q = tmp;
+	}
+	free((*sp));	
+}
+
+int mbox_create(mbox **mb) {
+  //*mb = malloc(sizeof(mbox));
+}
+
+void mbox_deposit(mbox *mb, char *msg, int len) {
+}
+
+void mbox_withdraw(mbox *mb, char *msg, int *len) {
+}
+
+
