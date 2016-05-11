@@ -141,39 +141,50 @@ void t_terminate() {
 	}
 }
 
+/* Create a new semaphore pointed to by sp with a count value of sem_count */
 int sem_init(sem_t **sp, int sem_count) {
   *sp = malloc(sizeof(sem_t));
   (*sp)->count = sem_count;
-  (*sp)->q = NULL;
+  (*sp)->q = (*sp)->q_end = NULL;
 }
 
+/* Current thrad does a wait on the specified semaphore */
 void sem_wait(sem_t *s) {
 	s->count--;
 
 	/* Blocked. Add to semaphore's queue */
 	if(s->count < 0) {
 		if(ready_high != NULL) {
-			tcb *tmp = s->q;
-			s->q = running;
-			s->q->next = tmp;
+			if(s->q == NULL) {
+				s->q = running;
+			} else {
+				s->q_end->next = running;
+			}
+			s->q_end = running;
+			s->q_end->next = NULL;
         	running = ready_high;
         	ready_high = ready_high->next;
 			if(ready_high == NULL) last_ready_high = ready_high;
         	running->next = NULL;
-        	swapcontext(s->q->thread_context, running->thread_context);
+        	swapcontext(s->q_end->thread_context, running->thread_context);
 		} else if(ready_low != NULL) {
-			tcb *tmp = s->q;
-			s->q = running;
-			s->q->next = tmp;
+			if(s->q == NULL) {
+				s->q = running;
+			} else {
+				s->q_end->next = running;
+			}
+			s->q_end = running;
+			s->q_end->next = NULL;
 			running = ready_low;
 			ready_low = ready_low->next;
 			if(ready_low == NULL) last_ready_low = ready_low;
 			running->next = NULL;
-			swapcontext(s->q->thread_context, running->thread_context);
+			swapcontext(s->q_end->thread_context, running->thread_context);
 		}
 	}
 }
 
+/* Current thread does a signal on the specified semaphore. Follows the Mesa semantics where the signaling thread continues and the first waiting thread becomes ready */
 void sem_signal(sem_t *s) {
 	s->count++;
 	if(s->q != NULL) {
@@ -188,6 +199,7 @@ void sem_signal(sem_t *s) {
 			last_ready_high = s->q;
 			last_ready_high->next = NULL;
 			s->q = tmp;
+			if(s->q == NULL) s->q_end = NULL;
 		} else {
 			if(ready_low == NULL) {
 				ready_low = s->q;
@@ -197,10 +209,12 @@ void sem_signal(sem_t *s) {
 			last_ready_low = s->q;
 			last_ready_low->next = NULL;
 			s->q = tmp;
+			if(s->q == NULL) s->q_end = NULL;
 		}
 	}
 }
 
+/* Destroy any state related to specified semaphore */
 void sem_destroy(sem_t **sp) {
 	tcb *tmp;
 	while((*sp)->q != NULL) {

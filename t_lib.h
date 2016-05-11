@@ -21,6 +21,7 @@ typedef struct tcb tcb;
 typedef struct {
   int count;
   tcb *q;
+  tcb *q_end;
 } sem_t;
 
 typedef struct msg {
