@@ -227,14 +227,57 @@ void sem_destroy(sem_t **sp) {
 	free((*sp));	
 }
 
+/* Create a mailbox pointed to by mb */
 int mbox_create(mbox **mb) {
-  //*mb = malloc(sizeof(mbox));
+	*mb = malloc(sizeof(mbox));
+	(*mb)->first = (*mb)->last = NULL;
+	sem_init(&((*mb)->mutex), 1);
 }
 
+/* Destroy any state related to the mailbox pointed to by mb */
+void mbox_destroy(mbox **mb) {
+	mboxnode *tmp;
+	while((*mb)->first != NULL) {
+    	tmp = (*mb)->first->next;
+		free((*mb)->first->message);
+		free((*mb)->first);
+		(*mb)->first = tmp;
+	}
+	free((*mb));
+	sem_destroy(&((*mb)->mutex));
+}
+
+/* Deposit message msg of length len into the mailbox pointed to by mb */
 void mbox_deposit(mbox *mb, char *msg, int len) {
+	mboxnode *tmp;
+	tmp = malloc(sizeof(mboxnode));
+	tmp->message = malloc((sizeof(char) * len) + 1);
+	strcpy(tmp->message, msg);
+	tmp->length = len;
+	tmp->next = NULL;
+	if(mb->first == NULL) {
+		mb->first = mb->last = tmp;
+	} else {
+		mb->last->next = tmp;
+		mb->last = tmp;	
+	}
 }
 
+/* Withdraw the first message from the mailbox pointed to by mb into msg and set the message's length in len accordingly */
 void mbox_withdraw(mbox *mb, char *msg, int *len) {
+	if(mb->first == NULL) {
+		len = 0;
+		msg = NULL;
+	} else {
+		mboxnode *tmp;
+		tmp = mb->first;
+		mb->first = mb->first->next;
+		if(mb->first == NULL) mb->last == NULL;
+		tmp->next = NULL;
+		strcpy(msg, tmp->message);
+		len = &(tmp->length);
+		free(tmp->message);
+		free(tmp);
+		tmp = NULL;
+	}
 }
-
-

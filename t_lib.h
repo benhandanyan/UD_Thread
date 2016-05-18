@@ -24,11 +24,13 @@ typedef struct {
   tcb *q_end;
 } sem_t;
 
-typedef struct msg {
+typedef struct mboxnode {
   char       *message;
   int         length;
-  struct msg *next;
-} msg;
+  int         sender;
+  int         receiver;
+  struct mboxnode *next;
+} mboxnode;
 
 typedef struct {
   struct mboxnode *first;
