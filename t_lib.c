@@ -40,6 +40,7 @@ void t_init() {
 	tcb *tmp;
 	tmp = (tcb *) malloc(sizeof(tcb));
 	tmp->thread_context = (ucontext_t *) malloc(sizeof(ucontext_t));
+	mbox_create(&tmp->messages);
 
 	tmp->thread_id = 0;
 	tmp->thread_priority = 1;
@@ -57,6 +58,7 @@ int t_create(void (*fct)(int), int id, int pri) {
 	tcb *tmp;
 	tmp = (tcb *) malloc(sizeof(tcb));
 	tmp->thread_context = (ucontext_t *) malloc(sizeof(ucontext_t));
+	mbox_create(&tmp->messages);
 
 	getcontext(tmp->thread_context);
 	tmp->thread_id = id;
@@ -100,6 +102,7 @@ void t_shutdown() {
 		tmp = running->next;
 		free(running->thread_context->uc_stack.ss_sp);
 		free(running->thread_context);
+		mbox_destroy(&running->messages);
 		free(running);
 		running = tmp;
 	}
@@ -107,6 +110,7 @@ void t_shutdown() {
 		tmp = ready_high->next;
 		free(ready_high->thread_context->uc_stack.ss_sp);
 		free(ready_high->thread_context);
+		mbox_destroy(&ready_high->messages);
 		free(ready_high);
 		ready_high = tmp;
 	}
@@ -114,6 +118,7 @@ void t_shutdown() {
 		tmp = ready_low->next;
 		free(ready_low->thread_context->uc_stack.ss_sp);
 		free(ready_low->thread_context);
+		mbox_destroy(&ready_low->messages);
 		free(ready_low);
 		ready_low = tmp;
 	}
@@ -136,6 +141,7 @@ void t_terminate() {
 		running->next = NULL;
 		free(tmp->thread_context->uc_stack.ss_sp);
 		free(tmp->thread_context);
+		mbox_destroy(&tmp->messages);
 		free(tmp);
 		setcontext(running->thread_context);	
 	}
@@ -284,4 +290,116 @@ void mbox_withdraw(mbox *mb, char *msg, int *len) {
 		tmp = NULL;
 	}
 	sem_signal(mb->mutex);
+}
+
+/* Send a message to the thread whose tid is tid. msg is the pointer to the start of the message, and len specifies the length of the message in bytes */
+void send(int tid, char *msg, int len) {
+	if(tid == running->thread_id) {
+		sem_wait(running->messages->mutex);
+		mboxnode *tmp;
+		tmp = malloc(sizeof(mboxnode));
+		tmp->message = malloc((sizeof(char) * len) + 1);
+    	strcpy(tmp->message, msg);
+    	tmp->length = len;
+		tmp->sender = tmp->receiver = tid;
+    	tmp->next = NULL;
+		if(running->messages->first == NULL) {
+        	running->messages->first = running->messages->last = tmp;
+    	} else {
+        	running->messages->last->next = tmp;
+        	running->messages->last = tmp;
+    	}	
+		sem_signal(running->messages->mutex);
+	} else {
+		int sent = 0;
+		tcb *thread;
+		thread = ready_high;
+		while(thread != NULL) {
+			if(tid == thread->thread_id) {
+				sent = 1;
+				sem_wait(thread->messages->mutex);
+				mboxnode *tmp;
+				tmp = malloc(sizeof(mboxnode));
+				tmp->message = malloc((sizeof(char) * len) + 1);
+				strcpy(tmp->message, msg);
+				tmp->length = len;
+				tmp->sender = running->thread_id;
+				tmp->receiver = tid;
+				tmp->next = NULL;
+				if(thread->messages->first == NULL) {
+					thread->messages->first = thread->messages->last = tmp;
+				} else {
+					thread->messages->last->next = tmp;
+					thread->messages->last = tmp;
+				}
+				sem_signal(thread->messages->mutex);
+				break;
+			}
+			thread = thread->next;
+		}
+		if(sent == 0) {
+			thread = ready_low;
+			while(thread != NULL) {
+				if(tid == thread->thread_id) {
+					sent = 1;
+                	sem_wait(thread->messages->mutex);
+                	mboxnode *tmp;
+                	tmp = malloc(sizeof(mboxnode));
+                	tmp->message = malloc((sizeof(char) * len) + 1);
+                	strcpy(tmp->message, msg);
+                	tmp->length = len;
+                	tmp->sender = running->thread_id;
+                	tmp->receiver = tid;
+                	tmp->next = NULL;
+                	if(thread->messages->first == NULL) {
+                    	thread->messages->first = thread->messages->last = tmp;
+                	} else {
+                    	thread->messages->last->next = tmp;
+                    	thread->messages->last = tmp;
+                	}
+                	sem_signal(thread->messages->mutex);
+					break;
+				}
+				thread = thread->next;
+			}
+		}
+	}
+}
+
+/* Wait for and receive a message from another thread. The caller has to specify the sender's tid in tid, or sets tid to 0 if it intends to receive a message sent by any thread. If there is no "matching" message to receive, the calling thread waits (i.e., blocks itself). [A sending thread is responsible for waking up a waiting, receiving thread.] Upon returning, the message is stored starting at msg. The tid of the thread that sent the message is stored in tid, and the length of the message is stored in len. */
+void receive(int *tid, char *msg, int *len) {
+	mboxnode *tmp;
+	tmp = running->messages->first;
+	if(tmp != NULL) {
+		if(tmp->receiver == running->thread_id && (*tid == 0 || *tid == tmp->sender)) {
+			running->messages->first = running->messages->first->next;
+			if(running->messages->first == NULL) running->messages->last = NULL;
+			tmp->next = NULL;
+			*tid = tmp->sender;
+			strcpy(msg, tmp->message);
+			*len = tmp->length;
+			free(tmp->message);
+			free(tmp);
+			tmp = NULL;
+		} else {
+			mboxnode *prev;
+			prev = tmp;
+			tmp = tmp->next;
+			while(tmp != NULL) {
+				if(tmp->receiver == running->thread_id && (*tid == 0 || *tid == tmp->sender)) {
+					prev->next = tmp->next;
+					tmp->next = NULL;
+					*tid = tmp->sender;
+					strcpy(msg, tmp->message);
+					*len = tmp->length;
+					free(tmp->message);
+					free(tmp);
+					tmp = NULL;
+					break;
+				}
+				prev = prev->next;
+				tmp = tmp->next;
+			}
+		}
+	}
 }

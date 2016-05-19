@@ -13,12 +13,13 @@ struct tcb {
 	int thread_id;
 	int thread_priority;
 	ucontext_t *thread_context;
+	struct mbox *messages;
 	struct tcb *next;
 };
 
 typedef struct tcb tcb;
 
-typedef struct {
+typedef struct sem_t {
   int count;
   tcb *q;
   tcb *q_end;
@@ -32,7 +33,7 @@ typedef struct mboxnode {
   struct mboxnode *next;
 } mboxnode;
 
-typedef struct {
+typedef struct mbox {
   struct mboxnode *first;
   struct mboxnode *last;
   sem_t *mutex;

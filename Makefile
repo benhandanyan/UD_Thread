@@ -5,17 +5,17 @@ CFLAGS = -g
 
 LIBOBJS = t_lib.o 
 
-TSTOBJS = test00.o test01.o test01x.o test03.o test06.o test07.o mytest.o philosophers.o 
+TSTOBJS = test00.o test01.o test01x.o test03.o test05.o test06.o test07.o test08.o mytest.o philosophers.o 
 
 # specify the executable 
 
-EXECS = test00 test01 test01x test03 test06 test07 mytest philosophers
+EXECS = test00 test01 test01x test03 test05 test06 test07 test08 mytest philosophers
 
 # specify the source files
 
 LIBSRCS = t_lib.c
 
-TSTSRCS = test00.c test01.c test01x.c test03.c test06.c test07.c mytest.c philosophers.c
+TSTSRCS = test00.c test01.c test01x.c test03.c test05.c test06.c test07.c test08.c mytest.c philosophers.c
 
 # ar creates the static thread library
 
@@ -46,11 +46,17 @@ mytest.o: mytest.c ud_thread.h Makefile
 philosophers.o: philosophers.c ud_thread.h Makefile
 	${CC} ${CFLAGS} -c philosophers.c
 
+test05.o: test05.c ud_thread.h Makefile
+	${CC} ${CFLAGS} -c test05.c
+
 test06.o: test06.c ud_thread.h Makefile
 	${CC} ${CFLAGS} -c test06.c
 
 test07.o: test07.c ud_thread.h Makefile
 	${CC} ${CFLAGS} -c test07.c
+
+test08.o: test08.c ud_thread.h Makefile
+	${CC} ${CFLAGS} -c test08.c
 
 test00: test00.o t_lib.a Makefile
 	${CC} ${CFLAGS} test00.o t_lib.a -o test00
@@ -64,10 +70,17 @@ test01x: test01x.o t_lib.a Makefile
 test03: test03.o t_lib.a Makefile
 	${CC} ${CFLAGS} test03.o t_lib.a -o test03
 
+test05: test05.o t_lib.a Makefile
+	${CC} ${CFLAGS} test05.o t_lib.a -o test05
+
 test06: test06.o t_lib.a Makefile
 	${CC} ${CFLAGS} test06.o t_lib.a -o test06
+
 test07: test07.o t_lib.a Makefile
 	${CC} ${CFLAGS} test07.o t_lib.a -o test07
+
+test08: test08.o t_lib.a Makefile
+	${CC} ${CFLAGS} test08.o t_lib.a -o test08
 
 mytest: mytest.o t_lib.a Makefile
 	${CC} ${CFLAGS} mytest.o t_lib.a -o mytest
