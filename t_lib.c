@@ -368,6 +368,7 @@ void send(int tid, char *msg, int len) {
 
 /* Wait for and receive a message from another thread. The caller has to specify the sender's tid in tid, or sets tid to 0 if it intends to receive a message sent by any thread. If there is no "matching" message to receive, the calling thread waits (i.e., blocks itself). [A sending thread is responsible for waking up a waiting, receiving thread.] Upon returning, the message is stored starting at msg. The tid of the thread that sent the message is stored in tid, and the length of the message is stored in len. */
 void receive(int *tid, char *msg, int *len) {
+	sem_wait(running->messages->mutex);
 	mboxnode *tmp;
 	tmp = running->messages->first;
 	if(tmp != NULL) {
@@ -402,4 +403,5 @@ void receive(int *tid, char *msg, int *len) {
 			}
 		}
 	}
+	sem_signal(running->messages->mutex);
 }
