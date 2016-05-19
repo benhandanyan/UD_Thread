@@ -249,6 +249,7 @@ void mbox_destroy(mbox **mb) {
 
 /* Deposit message msg of length len into the mailbox pointed to by mb */
 void mbox_deposit(mbox *mb, char *msg, int len) {
+	sem_wait(mb->mutex);
 	mboxnode *tmp;
 	tmp = malloc(sizeof(mboxnode));
 	tmp->message = malloc((sizeof(char) * len) + 1);
@@ -261,10 +262,12 @@ void mbox_deposit(mbox *mb, char *msg, int len) {
 		mb->last->next = tmp;
 		mb->last = tmp;	
 	}
+	sem_signal(mb->mutex);
 }
 
 /* Withdraw the first message from the mailbox pointed to by mb into msg and set the message's length in len accordingly */
 void mbox_withdraw(mbox *mb, char *msg, int *len) {
+	sem_wait(mb->mutex);
 	if(mb->first == NULL) {
 		len = 0;
 		msg = NULL;
@@ -280,4 +283,5 @@ void mbox_withdraw(mbox *mb, char *msg, int *len) {
 		free(tmp);
 		tmp = NULL;
 	}
+	sem_signal(mb->mutex);
 }
